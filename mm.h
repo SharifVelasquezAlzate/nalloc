@@ -1,5 +1,8 @@
+#pragma once
+
 #include <stdio.h>
 #include <string.h>
+#include <stdbool.h>
 #include "memlib.h"
 
 extern int mm_init (void);
@@ -24,12 +27,12 @@ typedef struct {
 /*                                   CUSTOM                                   */
 /* -------------------------------------------------------------------------- */
 typedef uint32_t hptr_t;
-#define BLOCK_PTR(x) ((BlockHeader*)((char*)mem_heap_lo() + x))
 #define NULL_HPTR UINT32_MAX
 
 #define ALIGNMENT 8
-// TODO: Fix ~0x7 to be compatible with any ALIGNMENT
-#define ALIGN(addr) (addr + ALIGNMENT - 1) & ~0x7
+// TODO: Fix it to be compatible with any ALIGNMENT
+#define ALIGN(addr) ((addr + ALIGNMENT - 1) & ~(ALIGNMENT-1))
+#define EXPANSION_FACTOR 0.35
 
 // TODO: Fix the BS -- Color should be in the rbtree file.
 
@@ -40,14 +43,16 @@ typedef enum : uint8_t {
 
 // Thank you NegVorsa!
 typedef struct {
-    const uint32_t size;
+    uint32_t size;
     hptr_t left;
     hptr_t right;
     hptr_t __pc;
 } BlockHeader;
 
+// 0 1 0 0 1 0 0 0
+
 typedef struct {
-    const uint32_t size;
+    uint32_t size;
 } BlockFooter;
 
 extern uint32_t bk_size(hptr_t block);
@@ -61,8 +66,11 @@ extern void bk_set_right(hptr_t block, hptr_t right);
 extern hptr_t bk_parent(hptr_t block);
 extern void bk_set_parent(hptr_t block, hptr_t parent);
 
-extern Color bk_color(hptr_t);
+extern Color bk_color(hptr_t block);
 extern void bk_set_color(hptr_t block, Color color);
+
+extern bool bk_is_free(hptr_t block);
+extern void bk_set_is_free(hptr_t block, bool is_free);
 
 extern team_t team;
 

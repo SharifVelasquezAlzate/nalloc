@@ -1,9 +1,13 @@
+#pragma once
+
 #include <stdint.h>
 #include <stdbool.h>
 
 #include "mm.h"
 
-typedef hptr_t rbtree_t;
+typedef struct {
+    hptr_t block;
+} rbtree_t;
 
 /**
  * @param block This block already exists

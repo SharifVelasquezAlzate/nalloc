@@ -2,15 +2,15 @@
 
 #include "rbtree.h"
 
-typedef hptr_t rbtree_t;
-
 // TODO: Change new_node name
 void rbtree_insert(rbtree_t rbtree, hptr_t new_node) {
+    hptr_t ghost_node = rbtree.block;
     hptr_t curr = root(rbtree);
+    bk_set_is_free(new_node, true);
 
     // If the tree is empty...
     if (root(rbtree) == NULL_HPTR) {
-        tlink(rbtree, new_node, true);
+        tlink(ghost_node, new_node, true);
         bk_set_color(root(rbtree), BLACK);
         return;
     }
@@ -40,7 +40,7 @@ void rbtree_insert(rbtree_t rbtree, hptr_t new_node) {
     // pose as the newly inserted node, and make our parent
     // be the current node. We re-run this until we reach the root.
 
-    while (new_node != rbtree) {
+    while (new_node != ghost_node) {
         // Case 0: new node is root --> make it black
         if (root(rbtree) == new_node) {
             bk_set_color(new_node, BLACK);
@@ -115,6 +115,7 @@ void rbtree_remove(rbtree_t rbtree, hptr_t block) {
     // If deleting the only node left...
     if (heir == NULL_HPTR && block == root(rbtree)) {
         set_root(rbtree, NULL_HPTR);
+        bk_set_is_free(block, false);
         return;
     }
 
@@ -132,6 +133,7 @@ void rbtree_remove(rbtree_t rbtree, hptr_t block) {
         // Case 1
         if (bk_color(block) == RED) {
             tlink(bk_parent(block), NULL_HPTR, is_lc(block));
+            bk_set_is_free(block, false);
             break;
         }
 
@@ -156,6 +158,7 @@ void rbtree_remove(rbtree_t rbtree, hptr_t block) {
 
             if (is_db_nil) {
                 tlink(bk_parent(block), NULL_HPTR, is_lc(block));
+                bk_set_is_free(block, false);
                 is_db_nil = false;
             }
 
@@ -204,6 +207,7 @@ void rbtree_remove(rbtree_t rbtree, hptr_t block) {
         
         if (is_db_nil) {
             tlink(bk_parent(block), NULL_HPTR, is_lc(block));
+            bk_set_is_free(block, false);
             is_db_nil = false;
         }
         bk_set_color(far_nephew, BLACK);
@@ -297,11 +301,11 @@ hptr_t right_rotate(hptr_t block) {
 
 /* ---------------------------- TREE DATA ACCESS ---------------------------- */
 hptr_t root(rbtree_t rbtree) {
-    return bk_left(rbtree);
+    return bk_left(rbtree.block);
 }
 
 void set_root(rbtree_t rbtree, hptr_t new_root) {
-    bk_set_left(rbtree, new_root);
+    bk_set_left(rbtree.block, new_root);
 }
 
 /* ----------------------------- FAMILY MEMBERS ----------------------------- */
