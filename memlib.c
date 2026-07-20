@@ -21,16 +21,16 @@ static char *mem_max_addr;   /* largest legal heap address */
 /* 
  * mem_init - initialize the memory system model
  */
-void mem_init(void)
-{
+void mem_init(char* heap, uint32_t og_size) {
     /* allocate the storage we will use to model the available VM */
-    if ((mem_start_brk = (char *)malloc(MAX_HEAP)) == NULL) {
-	fprintf(stderr, "mem_init_vm: malloc error\n");
-	exit(1);
+    mem_start_brk = (heap != NULL) ? heap : malloc(MAX_HEAP);
+    if (mem_start_brk == NULL) {
+	    fprintf(stderr, "mem_init_vm: malloc error\n");
+	    exit(1);
     }
 
     mem_max_addr = mem_start_brk + MAX_HEAP;  /* max legal heap address */
-    mem_brk = mem_start_brk;                  /* heap is empty initially */
+    mem_brk = mem_start_brk + og_size;                  
 }
 
 /* 

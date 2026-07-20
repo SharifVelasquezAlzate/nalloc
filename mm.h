@@ -45,7 +45,7 @@ typedef enum : uint8_t {
 
 // Thank you NegVorsa!
 typedef struct {
-    uint32_t size;
+    uint32_t __spff;
     hptr_t left;
     hptr_t right;
     hptr_t __pc;
@@ -57,7 +57,13 @@ typedef struct {
     uint32_t size;
 } BlockFooter;
 
+/* ------------------------- BLOCK MEMBER VARIABLES ------------------------- */
+
+/**
+ * @brief Stores the size of the block if it were to be provided for allocation
+ */
 extern uint32_t bk_size(hptr_t block);
+extern void bk_set_size(hptr_t block, uint32_t size);
 
 extern hptr_t bk_left(hptr_t block);
 extern void bk_set_left(hptr_t block, hptr_t left);
@@ -74,5 +80,10 @@ extern void bk_set_color(hptr_t block, Color color);
 extern bool bk_is_free(hptr_t block);
 extern void bk_set_is_free(hptr_t block, bool is_free);
 
+/* -------------------------- BLOCK FAMILY MEMBERS -------------------------- */
+extern hptr_t next_block(hptr_t block);
+
 extern team_t team;
 
+/* ---------------------------------- TEMP ---------------------------------- */
+extern hptr_t partition_block(hptr_t block, uint32_t size_needed);

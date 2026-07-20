@@ -1,11 +1,20 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include "mm.h"
 
-int main() {
-    mem_init();
+static char* heap;
 
-    char* a1 = mm_malloc(24);
-    strcpy(a1, "This is 23 bytes :D!!!");
-    printf("Hello!");
+bool TEST_PARTITION_BLOCK() {
+    bk_set_size(0, 124);
+    partition_block(0, 24);
+    
+    return true;
+}
+
+int main() {
+    heap = malloc(128);
+    mem_init(heap, 128);
+
+    TEST_PARTITION_BLOCK();
     return 0;
 }
