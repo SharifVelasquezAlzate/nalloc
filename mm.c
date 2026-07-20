@@ -33,6 +33,15 @@ uint32_t bk_size(hptr_t block) {
     return bk_header(block)->__spff & ~0b11;
 }
 
+bool bk_prev_free(hptr_t block) {
+    return bk_header(block)->__spff & 0b10;
+}
+
+void bk_set_prev_free(hptr_t block, bool prev_free) {
+    bk_header(block)->__spff &= ~0b10;
+    bk_header(block)->__spff |= prev_free << 1;
+}
+
 void bk_set_size(hptr_t block, uint32_t size) {
     assert(size % 4 == 0);
     bk_header(block)->__spff &= 0b11;
@@ -89,6 +98,9 @@ void bk_set_is_free(hptr_t block, bool is_free) {
 
 /* -------------------------- BLOCK FAMILY MEMEBERS ------------------------- */
 hptr_t next_block(hptr_t block){
+    if (block + sizeof(uint32_t) + bk_size(block) >= mem_heapsize()) {
+        return rbtree.block;
+    }
     return block + sizeof(uint32_t) + bk_size(block);
 }
 
@@ -112,7 +124,7 @@ hptr_t next_block(hptr_t block){
  * 
  * @param size_needed Size needed in "user size" (i.e., do not include metadata)
  * 
- * @remark This function updates the metadata of the blocks after partition
+ * @remark This function corrupts the rbtree metadata as well as curr_free
  */
 hptr_t partition_block(hptr_t block, uint32_t size_needed) {
     assert(!bk_is_free(block));
@@ -125,10 +137,15 @@ hptr_t partition_block(hptr_t block, uint32_t size_needed) {
 
     assert(total_right_space >= sizeof(BlockHeader) + sizeof(BlockFooter));
 
-    bk_set_size(block, size_needed);
-    bk_set_size(block + total_left_space, total_right_space - sizeof(uint32_t));
+    hptr_t right_bk = block + total_left_space;
 
-    return block + total_left_space;
+    bk_set_size(block, size_needed);
+
+    bk_set_size(right_bk, total_right_space - sizeof(uint32_t));
+    bk_set_is_free(right_bk, true);
+    bk_set_prev_free(right_bk, bk_is_free(block));
+
+    return right_bk;
 }
 
 hptr_t partition_if_worth_it(hptr_t block, uint32_t size_needed) {
@@ -136,6 +153,7 @@ hptr_t partition_if_worth_it(hptr_t block, uint32_t size_needed) {
     size_needed = ALIGN(sizeof(uint32_t) + size_needed) - sizeof(uint32_t);
     uint32_t total_left_space = sizeof(uint32_t) + size_needed;
 
+    // If the remaining block can host a 16-byte allocation, let it live
     if (block_space - total_left_space >= 20) {
         return partition_block(block, size_needed);
     }
@@ -154,9 +172,67 @@ int mm_init() {
 // Last block may not be free
 
 void* mm_malloc(size_t size) {
-    return 0;
+    // Lazy initialization
+    if (rbtree.block == NULL_HPTR) {
+        uint32_t padding = ALIGN((uintptr_t)mem_heap_lo()) - (uintptr_t)mem_heap_lo();
+        uint32_t ghost_node_size = ALIGN(sizeof(BlockHeader) + sizeof(BlockFooter));
+        mem_sbrk(padding + ghost_node_size);
+        // Setup ghost node
+        rbtree.block = padding;
+        bk_set_left(rbtree.block, NULL_HPTR);
+    }
+
+    size = ALIGN(sizeof(uint32_t) + size) - sizeof(uint32_t);
+
+    hptr_t free_block = rbtree_find(rbtree, size);
+
+    if (free_block != NULL_HPTR) {
+        rbtree_remove(rbtree, free_block);
+        hptr_t right_bk = partition_if_worth_it(free_block, size);
+        if (right_bk != NULL_HPTR) {
+            rbtree_insert(rbtree, right_bk);
+        }
+        return (char*)mem_heap_lo() + free_block + sizeof(uint32_t);
+    }
+
+    // There is no free block :(
+    // Don't forget to update prev_free on newly introduced block
+    uint32_t expansion_size = ALIGN(MAX(
+        MAX((uint32_t)(EXPANSION_FACTOR * mem_heapsize()), sizeof(uint32_t) + size),
+        sizeof(BlockHeader) + sizeof(BlockFooter)
+    ));
+    bool is_last_bk_free = bk_prev_free(rbtree.block);
+    hptr_t last_bk = NULL_HPTR;
+
+    if (is_last_bk_free) {
+        uint32_t last_bk_size = ((BlockFooter*)((char*)mem_heap_hi() - 3))->size;
+        last_bk = mem_heapsize() - last_bk_size - sizeof(uint32_t);
+        expansion_size -= sizeof(uint32_t) + last_bk_size;
+        
+        rbtree_remove(rbtree, last_bk);
+    }
+
+    mem_sbrk(expansion_size);
+
+    if (is_last_bk_free) {
+        bk_set_size(last_bk, bk_size(last_bk) + expansion_size);
+    } else {
+        // Convert expanded area into a block (last block, by definition)
+        last_bk = (uintptr_t)mem_sbrk(expansion_size) - (uintptr_t)mem_heap_lo();
+        bk_set_size(last_bk, expansion_size - sizeof(uint32_t));
+        bk_set_is_free(last_bk, true);
+        bk_set_prev_free(last_bk, false);
+    }
+
+    hptr_t right_bk = partition_if_worth_it(last_bk, size);
+    if (right_bk != NULL_HPTR) {
+        rbtree_insert(rbtree, right_bk);
+    }
+
+    return (char*)mem_heap_lo() + last_bk + sizeof(uint32_t);
 }
 
+// TODO: Reinstate metadata
 void mm_free(void* ptr) {
 
 }
