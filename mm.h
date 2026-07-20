@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
+#include <stdint.h>
+
 #include "memlib.h"
 
 extern int mm_init (void);

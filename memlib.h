@@ -1,5 +1,7 @@
 #include <unistd.h>
 
+#define MAX_HEAP (20 << 20)
+
 void mem_init(void);               
 void mem_deinit(void);
 void *mem_sbrk(int incr);

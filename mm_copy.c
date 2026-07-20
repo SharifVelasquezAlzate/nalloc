@@ -1,6 +1,5 @@
 #include <assert.h>
 #include <stdint.h>
-#include <stdlib.h>
 
 #include "common.h"
 #include "mm.h"
@@ -137,7 +136,57 @@ int mm_init() {
 // Last block may not be free
 
 void* mm_malloc(size_t size) {
-    return malloc(size);
+    // Lazy initial allocation
+    if (rbtree.block == NULL_HPTR) {
+        uint32_t padding = ALIGN((uintptr_t)mem_heap_lo()) - (uintptr_t)mem_heap_lo();
+        uint32_t ghost_node_size = ALIGN(sizeof(BlockHeader) + sizeof(BlockFooter));
+        mem_sbrk(padding + ghost_node_size);
+        // Setup ghost node
+        rbtree.block = padding;
+        bk_set_left(rbtree.block, NULL_HPTR);
+    }
+
+    // Search rbtree for free block
+    hptr_t best_fit_bk = rbtree_find(rbtree, size);
+
+    if (best_fit_bk != NULL_HPTR) {
+        rbtree_remove(rbtree, best_fit_bk);
+
+        hptr_t remaining_bk = partition_if_worth_it(best_fit_bk, size);
+        if (remaining_bk != NULL_HPTR) rbtree_insert(rbtree, remaining_bk);
+        
+        return (char*)(bk_header(best_fit_bk)) + sizeof(BlockHeader);
+    }
+
+    // If there is no free block, expand heap
+
+    // If last block is free...
+    BlockFooter* last_bk_footer = (BlockFooter*)((char*)mem_heap_hi() - sizeof(BlockFooter) + 1);
+    
+    hptr_t last_bk = ((uintptr_t)((char*)last_bk_footer - last_bk_footer->size - sizeof(BlockHeader)) - (uintptr_t)mem_heap_lo());
+
+    uint32_t block_size = ALIGN(sizeof(BlockHeader) + size + sizeof(BlockFooter));
+    uint32_t needed_space = block_size;
+    
+    if (bk_is_free(last_bk)) {
+        uint32_t reusable_space = sizeof(BlockHeader) + last_bk_footer->size + sizeof(BlockFooter);
+        needed_space -= reusable_space;
+    }
+    
+    uint32_t expansion_size = ALIGN(MAX((uint32_t)(EXPANSION_FACTOR * mem_heapsize()), (uint32_t)needed_space));
+    mem_sbrk(expansion_size);
+
+    // Get last block out of the red black tree (its size is about to change)
+    rbtree_remove(rbtree, last_bk);
+    // Update the size
+    bk_header(last_bk)->size = bk_size(last_bk) + expansion_size - sizeof(BlockFooter);
+    bk_footer(last_bk)->size = bk_size(last_bk);
+
+    // Give to the user the block they need
+    hptr_t remaining_bk = partition_if_worth_it(last_bk, size);
+    if (remaining_bk != NULL_HPTR) rbtree_insert(rbtree, remaining_bk);
+
+    return (char*)(bk_header(last_bk)) + sizeof(BlockHeader);
 }
 
 void mm_free(void* ptr) {
