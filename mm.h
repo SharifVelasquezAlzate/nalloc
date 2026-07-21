@@ -8,7 +8,7 @@
 #include "memlib.h"
 
 extern int mm_init (void);
-extern void *mm_malloc (size_t size);
+extern void *nalloc (size_t size);
 extern void mm_free (void *ptr);
 extern void *mm_realloc(void *ptr, size_t size);
 
@@ -64,6 +64,9 @@ typedef struct {
  */
 extern uint32_t bk_size(hptr_t block);
 extern void bk_set_size(hptr_t block, uint32_t size);
+
+extern bool bk_prev_free(hptr_t block);
+extern void bk_set_prev_free(hptr_t block, bool prev_free);
 
 extern hptr_t bk_left(hptr_t block);
 extern void bk_set_left(hptr_t block, hptr_t left);

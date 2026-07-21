@@ -4,9 +4,9 @@
 
 // TODO: Change new_node name
 void rbtree_insert(rbtree_t rbtree, hptr_t new_node) {
+    assert(bk_is_free(new_node));
     hptr_t ghost_node = rbtree.block;
     hptr_t curr = root(rbtree);
-    bk_set_is_free(new_node, true);
 
     // If the tree is empty...
     if (root(rbtree) == NULL_HPTR) {
@@ -107,6 +107,7 @@ hptr_t rbtree_find(rbtree_t rbtree, uint32_t size) {
 }
 
 void rbtree_remove(rbtree_t rbtree, hptr_t block) {
+    assert(bk_is_free(block));
     // Remove element as if in a BST
     hptr_t succ = min_node(bk_right(block));
     hptr_t pred = max_node(bk_left(block));
@@ -115,7 +116,6 @@ void rbtree_remove(rbtree_t rbtree, hptr_t block) {
     // If deleting the only node left...
     if (heir == NULL_HPTR && block == root(rbtree)) {
         set_root(rbtree, NULL_HPTR);
-        bk_set_is_free(block, false);
         return;
     }
 
@@ -133,7 +133,6 @@ void rbtree_remove(rbtree_t rbtree, hptr_t block) {
         // Case 1
         if (bk_color(block) == RED) {
             tlink(bk_parent(block), NULL_HPTR, is_lc(block));
-            bk_set_is_free(block, false);
             break;
         }
 
@@ -158,7 +157,6 @@ void rbtree_remove(rbtree_t rbtree, hptr_t block) {
 
             if (is_db_nil) {
                 tlink(bk_parent(block), NULL_HPTR, is_lc(block));
-                bk_set_is_free(block, false);
                 is_db_nil = false;
             }
 
@@ -207,7 +205,6 @@ void rbtree_remove(rbtree_t rbtree, hptr_t block) {
         
         if (is_db_nil) {
             tlink(bk_parent(block), NULL_HPTR, is_lc(block));
-            bk_set_is_free(block, false);
             is_db_nil = false;
         }
         bk_set_color(far_nephew, BLACK);
