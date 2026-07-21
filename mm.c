@@ -96,7 +96,7 @@ void bk_set_is_free(hptr_t block, bool is_free) {
     bk_header(next_block(block))->__spff |= is_free << 1;
 }
 
-/* -------------------------- BLOCK FAMILY MEMEBERS ------------------------- */
+/* -------------------------- BLOCK FAMILY MEMBERS ------------------------- */
 hptr_t next_block(hptr_t block){
     if (block + sizeof(uint32_t) + bk_size(block) >= mem_heapsize()) {
         return rbtree.block;
@@ -179,7 +179,9 @@ void* mm_malloc(size_t size) {
         mem_sbrk(padding + ghost_node_size);
         // Setup ghost node
         rbtree.block = padding;
+        //! Fix this BS
         bk_set_left(rbtree.block, NULL_HPTR);
+        bk_set_prev_free(rbtree.block, false);
     }
 
     size = ALIGN(sizeof(uint32_t) + size) - sizeof(uint32_t);
@@ -218,9 +220,9 @@ void* mm_malloc(size_t size) {
         bk_set_size(last_bk, bk_size(last_bk) + expansion_size);
     } else {
         // Convert expanded area into a block (last block, by definition)
-        last_bk = (uintptr_t)mem_sbrk(expansion_size) - (uintptr_t)mem_heap_lo();
+        last_bk = mem_heapsize() - expansion_size;
         bk_set_size(last_bk, expansion_size - sizeof(uint32_t));
-        bk_set_is_free(last_bk, true);
+        bk_set_is_free(last_bk, false);
         bk_set_prev_free(last_bk, false);
     }
 
@@ -234,7 +236,7 @@ void* mm_malloc(size_t size) {
 
 // TODO: Reinstate metadata
 void mm_free(void* ptr) {
-
+    
 }
 
 void* mm_realloc(void* ptr, size_t size) {
