@@ -78,3 +78,17 @@ hptr_t max_node(hptr_t block);
 /* ---------------------------------- SHAPE --------------------------------- */
 char check_if_triangle(hptr_t block);
 char check_if_line(hptr_t block);
+
+/* -------------------------------- DEBUGGING ------------------------------- */
+typedef struct {
+    Color color;
+    hptr_t left;
+    hptr_t right;
+    hptr_t parent;
+    uint32_t size;
+} Node;
+
+extern Node snode(uint32_t size);
+extern Node csnode(Color color, uint32_t size);
+extern Node node(Color color, uint32_t size, hptr_t left, hptr_t right, hptr_t parent);
+extern uint32_t rbtree_to_vec(hptr_t block, Node* result);

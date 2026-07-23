@@ -36,25 +36,25 @@ BlockFooter* bk_footer(hptr_t block) {
  */
 uint32_t bk_size(hptr_t block) {
     assert(block != NULL_HPTR);
-    return bk_header(block)->__spff & ~0b11;
+    return bk_header(block)->__spfc & ~0b11;
 }
 
 bool bk_prev_free(hptr_t block) {
     assert(block != NULL_HPTR);
-    return bk_header(block)->__spff & 0b10;
+    return bk_header(block)->__spfc & 0b10;
 }
 
 void bk_set_prev_free(hptr_t block, bool prev_free) {
     assert(block != NULL_HPTR);
-    bk_header(block)->__spff &= ~0b10;
-    bk_header(block)->__spff |= prev_free << 1;
+    bk_header(block)->__spfc &= ~0b10;
+    bk_header(block)->__spfc |= prev_free << 1;
 }
 
 void bk_set_size(hptr_t block, uint32_t size) {
     assert(block != NULL_HPTR);
-    assert(size % 4 == 0);
-    bk_header(block)->__spff &= 0b11;
-    bk_header(block)->__spff |= size;
+    // assert(size % 4 == 0);
+    bk_header(block)->__spfc &= 0b11;
+    bk_header(block)->__spfc |= size;
     bk_footer(block)->size = size;
 }
 
@@ -80,37 +80,33 @@ void bk_set_right(hptr_t block, hptr_t right) {
 
 hptr_t bk_parent(hptr_t block) {
     assert(block != NULL_HPTR);
-    return bk_header(block)->__pc & ~0b1;
+    return bk_header(block)->parent;
 }
 
 void bk_set_parent(hptr_t block, hptr_t parent) {
     assert(block != NULL_HPTR);
-    bk_header(block)->__pc &= 0b1;
-    bk_header(block)->__pc |= parent;
+    bk_header(block)->parent = parent;
 }
 
 Color bk_color(hptr_t block) {
-    assert(block != NULL_HPTR);
-    return bk_header(block)->__pc & 0b1;
+    return (block == NULL_HPTR) ? BLACK : bk_header(block)->__spfc & 0b1;
 }
 
 void bk_set_color(hptr_t block, Color color) {
     assert(block != NULL_HPTR);
-    bk_header(block)->__pc &= ~0b1;
-    bk_header(block)->__pc |= (hptr_t)color;
+    bk_header(block)->__spfc &= ~0b1;
+    bk_header(block)->__spfc |= (hptr_t)color;
 }
 
 // size | prev_free | free
 
 bool bk_is_free(hptr_t block) {
     assert(block != NULL_HPTR);
-    return bk_header(block)->__spff & 0b1;
+    return bk_prev_free(next_block(block));
 }
 
 void bk_set_is_free(hptr_t block, bool is_free) {
     assert(block != NULL_HPTR);
-    bk_header(block)->__spff &= ~0b1;
-    bk_header(block)->__spff |= is_free;
     
     // If this is the last block, the ghost node contains its prev free
     if (block + sizeof(uint32_t) + bk_size(block) >= mem_heapsize()) {
@@ -153,8 +149,8 @@ hptr_t next_block(hptr_t block){
  */
 hptr_t partition_block(hptr_t block, uint32_t size_needed) {
     assert(!bk_is_free(block));
+    assert(size_needed >= 16);
     size_needed = ALIGN(sizeof(uint32_t) + size_needed) - sizeof(uint32_t);
-    assert(size_needed >= 20);
 
     uint32_t total_space = sizeof(uint32_t) + bk_size(block);
     uint32_t total_left_space = sizeof(uint32_t) + size_needed;
@@ -175,11 +171,12 @@ hptr_t partition_block(hptr_t block, uint32_t size_needed) {
 
 hptr_t partition_if_worth_it(hptr_t block, uint32_t size_needed) {
     uint32_t block_space = sizeof(uint32_t) + bk_size(block);
+    size_needed = MAX(size_needed, 16);
     size_needed = ALIGN(sizeof(uint32_t) + size_needed) - sizeof(uint32_t);
     uint32_t total_left_space = sizeof(uint32_t) + size_needed;
 
     // If the remaining block can host a 16-byte allocation, let it live
-    if (block_space - total_left_space >= 20) {
+    if (block_space - total_left_space >= sizeof(uint32_t) + 16) {
         return partition_block(block, size_needed);
     }
 
@@ -241,6 +238,7 @@ void* nalloc(size_t size) {
     }
 
     // There is no free block :(
+    // TODO: Perform calculation of recyclable space before expansion size
     // Don't forget to update prev_free on newly introduced block
     uint32_t expansion_size = ALIGN(MAX(
         MAX((uint32_t)(EXPANSION_FACTOR * mem_heapsize()), sizeof(uint32_t) + size),
@@ -265,10 +263,10 @@ void* nalloc(size_t size) {
         // Convert expanded area into a block (last block, by definition)
         last_bk = mem_heapsize() - expansion_size;
         bk_set_size(last_bk, expansion_size - sizeof(uint32_t));
-        bk_set_is_free(last_bk, false);
         bk_set_prev_free(last_bk, false);
     }
 
+    bk_set_is_free(last_bk, false);
     hptr_t right_bk = partition_if_worth_it(last_bk, size);
     if (right_bk != NULL_HPTR) {
         bk_set_is_free(right_bk, true);
@@ -278,7 +276,6 @@ void* nalloc(size_t size) {
     return (char*)mem_heap_lo() + last_bk + sizeof(uint32_t);
 }
 
-// TODO: Reinstate metadata
 void mm_free(void* ptr) {
     // We need to reinstate metadata
     hptr_t block = (uintptr_t)((char*)ptr - sizeof(uint32_t)) - (uintptr_t)mem_heap_lo(); 

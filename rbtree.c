@@ -5,6 +5,13 @@
 // TODO: Change new_node name
 void rbtree_insert(rbtree_t rbtree, hptr_t new_node) {
     assert(bk_is_free(new_node));
+
+    // Starting metadata
+    bk_set_left(new_node, NULL_HPTR);
+    bk_set_right(new_node, NULL_HPTR);
+    bk_set_parent(new_node, NULL_HPTR);
+    bk_set_color(new_node, RED);
+
     hptr_t ghost_node = rbtree.block;
     hptr_t curr = root(rbtree);
 
@@ -62,6 +69,7 @@ void rbtree_insert(rbtree_t rbtree, hptr_t new_node) {
             // Move up the tree
             new_node = curr;
             curr = bk_parent(curr);
+            continue;
         }
 
         // Case 2: uncle is black, and new_node forms a triangle with its grandpa
@@ -355,4 +363,33 @@ char check_if_line(hptr_t block) {
     if (is_lc(block) && is_lc(bk_parent(block))) return -1;
     if (!is_lc(block) && !is_lc(bk_parent(block))) return 1;
     return 0;
+}
+
+/* -------------------------------- DEBUGGING ------------------------------- */
+Node snode(uint32_t size) {
+    Node nody = { RED, NULL_HPTR, NULL_HPTR, NULL_HPTR, size };
+    return nody;
+}
+
+Node csnode(Color color, uint32_t size) {
+    Node nody = { color, NULL_HPTR, NULL_HPTR, NULL_HPTR, size };
+    return nody;
+}
+
+Node node(Color color, uint32_t size, hptr_t left, hptr_t right, hptr_t parent) {
+    Node nody = { color, left, right, parent, size };
+    return nody;
+}
+
+uint32_t rbtree_to_vec(hptr_t block, Node* result) {
+    if (block == NULL_HPTR) return 0;
+    result->color = bk_color(block);
+    result->left = bk_left(block);
+    result->right = bk_right(block);
+    result->parent = bk_parent(block);
+    result->size = bk_size(block);
+    
+    uint32_t l_elems = rbtree_to_vec(bk_left(block), result + 1);
+    uint32_t r_elems = rbtree_to_vec(bk_right(block), result + 1 + l_elems);
+    return 1 + l_elems + r_elems;
 }

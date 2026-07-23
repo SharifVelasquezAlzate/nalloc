@@ -45,10 +45,10 @@ typedef enum : uint8_t {
 
 // Thank you NegVorsa!
 typedef struct {
-    uint32_t __spff;
+    uint32_t __spfc;
     hptr_t left;
     hptr_t right;
-    hptr_t __pc;
+    hptr_t parent;
 } BlockHeader;
 
 // 0 1 0 0 1 0 0 0
